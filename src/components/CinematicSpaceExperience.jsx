@@ -138,13 +138,24 @@ function CinematicSpaceExperience() {
     const mouseRef = useRef({ x: 0, y: 0 })
     const [progress, setProgress] = useState(0)
     const [audioOn, setAudioOn] = useState(true)
+    const [menuOpen, setMenuOpen] = useState(false)
     const quality = useMemo(() => getQualitySettings(), [])
     const textureUrls = useMemo(() => getPlanetTextureUrls(quality.textureRes), [quality.textureRes])
 
     useSpaceAudio(progressRef, audioOn)
 
+    const scrollToScene = (scene) => {
+        if (!journeyRef.current) return
+        const [start] = scene.range
+        const targetProgress = start + 0.005
+        const scrollHeight = journeyRef.current.scrollHeight - window.innerHeight
+        window.scrollTo({
+            top: targetProgress * scrollHeight,
+            behavior: 'smooth'
+        })
+    }
+
     useLayoutEffect(() => {
-        let hudTick = 0
         const trigger = ScrollTrigger.create({
             trigger: journeyRef.current,
             start: 'top top',
@@ -152,8 +163,7 @@ function CinematicSpaceExperience() {
             scrub: 1.15,
             onUpdate: (self) => {
                 progressRef.current = self.progress
-                hudTick += 1
-                if (hudTick % 2 === 0) setProgress(self.progress)
+                setProgress(self.progress)
             },
         })
 
@@ -207,12 +217,15 @@ function CinematicSpaceExperience() {
                 audioOn={audioOn}
                 onToggleAudio={() => setAudioOn((v) => !v)}
                 quality={quality}
+                menuOpen={menuOpen}
+                setMenuOpen={setMenuOpen}
+                scrollToScene={scrollToScene}
             />
         </div>
     )
 }
 
-function JourneyHud({ progress, activeScene, audioOn, onToggleAudio, quality }) {
+function JourneyHud({ progress, activeScene, audioOn, onToggleAudio, quality, menuOpen, setMenuOpen, scrollToScene }) {
     const activeIndex = SCENES.findIndex((scene) => scene.id === activeScene.id)
     const heroVisible = progress < 0.095
     const altitude = Math.round(420 - progress * 420)
@@ -234,6 +247,14 @@ function JourneyHud({ progress, activeScene, audioOn, onToggleAudio, quality }) 
                     >
                         {audioOn ? 'Audio on' : 'Audio off'}
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => setMenuOpen(!menuOpen)}
+                        className="pointer-events-auto hud-chip px-3 py-2 text-[0.58rem] uppercase tracking-[0.28em] text-white/70 transition hover:text-cyan-100 md:hidden"
+                        aria-label="Toggle navigation menu"
+                    >
+                        {menuOpen ? 'Close' : 'Menu'}
+                    </button>
                     <span className="hud-chip px-4 py-2 text-[0.62rem] uppercase tracking-[0.32em] text-white/62">
                         {String(activeIndex + 1).padStart(2, '0')} / {String(SCENES.length).padStart(2, '0')}
                     </span>
@@ -251,14 +272,14 @@ function JourneyHud({ progress, activeScene, audioOn, onToggleAudio, quality }) 
                 {heroVisible ? (
                     <motion.div
                         key="hero"
-                        initial={{ opacity: 0, y: 24 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -18 }}
+                        initial={{ opacity: 0, x: "-50%", y: 24 }}
+                        animate={{ opacity: 1, x: "-50%", y: 0 }}
+                        exit={{ opacity: 0, x: "-50%", y: -18 }}
                         transition={{ duration: 0.8, ease: 'easeOut' }}
-                        className="absolute left-1/2 top-[18vh] w-[min(760px,88vw)] -translate-x-1/2 text-center"
+                        className="absolute left-1/2 top-[18vh] w-[min(760px,88vw)] text-center"
                     >
-                        <p className="mb-4 text-xs uppercase tracking-[0.55em] text-cyan-200/72">Deep space transmission</p>
-                        <h1 className="text-5xl font-semibold leading-[0.95] text-white md:text-8xl">
+                        <p className="mb-4 text-[0.62rem] sm:text-xs uppercase tracking-[0.3em] sm:tracking-[0.55em] text-cyan-200/72">Deep space transmission</p>
+                        <h1 className="text-4xl sm:text-5xl font-semibold leading-[0.95] text-white md:text-8xl">
                             Explore The Universe
                         </h1>
                     </motion.div>
@@ -284,6 +305,51 @@ function JourneyHud({ progress, activeScene, audioOn, onToggleAudio, quality }) 
                 )}
             </AnimatePresence>
 
+            <AnimatePresence>
+                {menuOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.3 }}
+                        className="pointer-events-auto fixed inset-x-4 top-[5.5rem] bottom-20 z-30 flex flex-col gap-3 overflow-y-auto rounded-lg border border-cyan-400/20 p-6 backdrop-blur-xl md:hidden"
+                        style={{
+                            background: 'linear-gradient(135deg, rgba(3, 8, 24, 0.95), rgba(8, 20, 48, 0.9))',
+                            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), inset 0 1px 1px rgba(255, 255, 255, 0.05)'
+                        }}
+                    >
+                        <p className="text-[0.52rem] uppercase tracking-[0.35em] text-cyan-200/60 mb-2 border-b border-cyan-400/10 pb-2">
+                            Odyssey Navigation
+                        </p>
+                        <div className="flex flex-col gap-4">
+                            {SCENES.map((scene, index) => (
+                                <button
+                                    key={scene.id}
+                                    type="button"
+                                    onClick={() => {
+                                        scrollToScene(scene)
+                                        setMenuOpen(false)
+                                    }}
+                                    className="flex items-center justify-between text-left group pointer-events-auto"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <span className={`text-[0.62rem] font-mono ${scene.id === activeScene.id ? 'text-cyan-300' : 'text-white/40'}`}>
+                                            {String(index + 1).padStart(2, '0')}
+                                        </span>
+                                        <span className={`text-xs uppercase tracking-[0.15em] ${scene.id === activeScene.id ? 'text-cyan-100 font-medium' : 'text-white/70 group-hover:text-white'}`}>
+                                            {scene.title}
+                                        </span>
+                                    </div>
+                                    {scene.id === activeScene.id && (
+                                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.8)]" />
+                                    )}
+                                </button>
+                            ))}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <div className="pointer-events-none absolute bottom-5 left-1/2 h-[2px] w-[min(760px,78vw)] -translate-x-1/2 overflow-hidden rounded-full bg-white/8">
                 <motion.div
                     className="h-full bg-gradient-to-r from-cyan-300/40 via-cyan-200 to-white"
@@ -293,12 +359,17 @@ function JourneyHud({ progress, activeScene, audioOn, onToggleAudio, quality }) 
 
             <div className="absolute bottom-14 right-4 hidden max-h-[38vh] w-44 flex-col gap-2 overflow-y-auto md:right-8 md:flex">
                 {SCENES.map((scene) => (
-                    <div key={scene.id} className="flex items-center gap-3">
+                    <button
+                        key={scene.id}
+                        type="button"
+                        onClick={() => scrollToScene(scene)}
+                        className="pointer-events-auto flex items-center gap-3 text-right hover:opacity-80 transition"
+                    >
                         <span className={`h-px flex-1 ${scene.id === activeScene.id ? 'bg-cyan-200' : 'bg-white/12'}`} />
                         <span className={`text-[0.56rem] uppercase tracking-[0.2em] ${scene.id === activeScene.id ? 'text-cyan-100' : 'text-white/34'}`}>
                             {scene.title}
                         </span>
-                    </div>
+                    </button>
                 ))}
             </div>
         </div>
